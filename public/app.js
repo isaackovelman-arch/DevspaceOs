@@ -107,6 +107,9 @@ function updateClock() {
   var m = String(now.getMinutes()).padStart(2,'0');
   var el = document.getElementById('taskbar-clock');
   if (el) el.textContent = h + ':' + m;
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var de = document.getElementById('taskbar-date');
+  if (de) de.textContent = months[now.getMonth()] + ' ' + now.getDate();
 }
 updateClock();
 setInterval(updateClock, 10000);
@@ -507,6 +510,66 @@ function toast(msg) {
   if (!el) return;
   el.textContent = msg; el.classList.add('show');
   setTimeout(function() { el.classList.remove('show'); }, 2500);
+}
+
+
+/* ── BROWSER ─────────────────────────────────────────────────────────────── */
+var browserHist = [];
+var browserCurrent = '';
+
+function browserEncode(u) {
+  try {
+    var b = btoa(unescape(encodeURIComponent(u))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    return '/proxy/' + b;
+  } catch(e) { return u; }
+}
+
+function browserNormalize(raw) {
+  raw = raw.trim();
+  if (!raw) return null;
+  if (!raw.includes('.') || raw.includes(' ')) return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
+  if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw;
+  return raw;
+}
+
+function browserNavTo(target) {
+  browserCurrent = target;
+  var input = document.getElementById('browser-url-input');
+  var frame = document.getElementById('browser-frame');
+  var shortcuts = document.getElementById('browser-shortcuts');
+  if (input) input.value = target;
+  if (frame) { frame.style.display = 'block'; frame.src = browserEncode(target); }
+  if (shortcuts) shortcuts.style.display = 'none';
+  browserHist.push(target);
+}
+
+function browserGo(e) {
+  if (e && e.key !== 'Enter') return;
+  var raw = document.getElementById('browser-url-input').value;
+  var target = browserNormalize(raw);
+  if (!target) return;
+  browserNavTo(target);
+}
+
+function browserGoBtn() {
+  var raw = document.getElementById('browser-url-input').value;
+  var target = browserNormalize(raw);
+  if (!target) return;
+  browserNavTo(target);
+}
+
+function browserBack() {
+  if (browserHist.length > 1) {
+    browserHist.pop();
+    var prev = browserHist[browserHist.length - 1];
+    browserNavTo(prev);
+    browserHist.pop(); // browserNavTo pushes again
+  }
+}
+
+function browserReload() {
+  var frame = document.getElementById('browser-frame');
+  if (frame && frame.src) { var s = frame.src; frame.src = ''; frame.src = s; }
 }
 
 /* ── BOOT ────────────────────────────────────────────────────────────────── */
