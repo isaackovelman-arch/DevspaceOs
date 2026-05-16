@@ -89,34 +89,30 @@
       </div>
       <div class="win-title">Browser</div>
     </div>
-    <div class="win-body" style="flex-direction:column;">
-      <!-- Browser toolbar -->
+    <div class="win-body" style="flex-direction:column;background:#3c3c3c;">
+      <!-- Tab bar -->
+      <div class="browser-tabbar" id="browser-tabbar">
+        <!-- tabs injected by JS -->
+        <button class="browser-new-tab-btn" onclick="browserNewTab()" title="New tab">+</button>
+      </div>
+      <!-- Address bar -->
       <div class="browser-bar">
-        <button class="browser-nav-btn" onclick="browserBack()" title="Back">&#8592;</button>
-        <button class="browser-nav-btn" onclick="browserReload()" title="Reload">&#8635;</button>
+        <button class="browser-nav-btn" onclick="browserBack()">&#8592;</button>
+        <button class="browser-nav-btn" onclick="browserFwd()">&#8594;</button>
+        <button class="browser-nav-btn" onclick="browserReload()">&#8635;</button>
         <div class="browser-url-wrap">
-          <input class="browser-url-input" id="browser-url-input" type="text" placeholder="Search or enter a URL..." autocomplete="off" spellcheck="false" onkeydown="browserGo(event)"/>
-          <button class="browser-go-btn" onclick="browserGoBtn()">Go</button>
+          <input class="browser-url-input" id="browser-url-input" type="text"
+            placeholder="Search or type a URL"
+            autocomplete="off" spellcheck="false"
+            onkeydown="browserGo(event)"
+            onfocus="this.select()"/>
         </div>
       </div>
-      <!-- Shortcuts bar (shown when no page loaded) -->
-      <div class="browser-shortcuts" id="browser-shortcuts">
-        <div class="browser-sc-label">Quick Access</div>
-        <div class="browser-sc-grid">
-          <div class="browser-sc" onclick="browserNavTo('https://google.com')"><div class="browser-sc-icon">G</div><span>Google</span></div>
-          <div class="browser-sc" onclick="browserNavTo('https://youtube.com')"><div class="browser-sc-icon">YT</div><span>YouTube</span></div>
-          <div class="browser-sc" onclick="browserNavTo('https://reddit.com')"><div class="browser-sc-icon">R</div><span>Reddit</span></div>
-          <div class="browser-sc" onclick="browserNavTo('https://twitter.com')"><div class="browser-sc-icon">X</div><span>Twitter</span></div>
-          <div class="browser-sc" onclick="browserNavTo('https://discord.com')"><div class="browser-sc-icon">D</div><span>Discord</span></div>
-          <div class="browser-sc" onclick="browserNavTo('https://github.com')"><div class="browser-sc-icon">GH</div><span>GitHub</span></div>
-          <div class="browser-sc" onclick="browserNavTo('https://twitch.tv')"><div class="browser-sc-icon">TV</div><span>Twitch</span></div>
-          <div class="browser-sc" onclick="browserNavTo('https://wikipedia.org')"><div class="browser-sc-icon">W</div><span>Wikipedia</span></div>
-        </div>
+      <!-- Tab content area -->
+      <div class="browser-content" id="browser-content">
+        <!-- new tab pages + iframes injected by JS -->
       </div>
-      <!-- Proxy iframe -->
-      <iframe id="browser-frame" src="" style="flex:1;border:none;width:100%;display:none;" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-modals allow-downloads"></iframe>
     </div>
-  </div>
 
   <!-- CLOAKERS WINDOW -->
   <div class="os-window" id="win-cloak" style="display:none;left:100px;top:70px;width:680px;height:620px;">
