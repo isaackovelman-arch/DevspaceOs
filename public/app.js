@@ -514,8 +514,9 @@ function toast(msg) {
 
 
 /* ── BROWSER ─────────────────────────────────────────────────────────────── */
-var browserHist = [];
-var browserCurrent = '';
+var browserTabs = [];
+var browserActiveTab = null;
+var browserTabCounter = 0;
 
 function browserEncode(u) {
   try {
@@ -525,52 +526,218 @@ function browserEncode(u) {
 }
 
 function browserNormalize(raw) {
-  raw = raw.trim();
+  raw = (raw || '').trim();
   if (!raw) return null;
   if (!raw.includes('.') || raw.includes(' ')) return 'https://www.google.com/search?q=' + encodeURIComponent(raw);
   if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw;
   return raw;
 }
 
-function browserNavTo(target) {
-  browserCurrent = target;
-  var input = document.getElementById('browser-url-input');
-  var frame = document.getElementById('browser-frame');
-  var shortcuts = document.getElementById('browser-shortcuts');
-  if (input) input.value = target;
-  if (frame) { frame.style.display = 'block'; frame.src = browserEncode(target); }
-  if (shortcuts) shortcuts.style.display = 'none';
-  browserHist.push(target);
+function browserNewTab(url) {
+  var id = 'brtab' + (browserTabCounter++);
+  var tab = { id: id, url: url || '', title: 'New Tab', hist: [], fwd: [] };
+  browserTabs.push(tab);
+
+  // Tab pill - use DOM methods to avoid quote escaping
+  var tabbar = document.getElementById('browser-tabbar');
+  var newBtn = tabbar.querySelector('.browser-new-tab-btn');
+  var pill = document.createElement('div');
+  pill.className = 'browser-tab';
+  pill.id = 'pill-' + id;
+
+  var titleSpan = document.createElement('span');
+  titleSpan.className = 'browser-tab-title';
+  titleSpan.id = 'title-' + id;
+  titleSpan.textContent = 'New Tab';
+  pill.appendChild(titleSpan);
+
+  var closeSpan = document.createElement('span');
+  closeSpan.className = 'browser-tab-close';
+  closeSpan.textContent = '×';
+  closeSpan.addEventListener('click', (function(tid){ return function(e){ browserCloseTab(e, tid); }; })(id));
+  pill.appendChild(closeSpan);
+
+  pill.addEventListener('click', (function(tid){ return function(e){ if (!e.target.classList.contains('browser-tab-close')) browserSwitchTab(tid); }; })(id));
+  tabbar.insertBefore(pill, newBtn);
+
+  // New tab page - use DOM methods
+  var content = document.getElementById('browser-content');
+  var page = document.createElement('div');
+  page.className = 'browser-tab-page';
+  page.id = 'page-' + id;
+
+  var titleDiv = document.createElement('div');
+  titleDiv.style.cssText = 'font-size:22px;font-weight:600;color:rgba(255,255,255,0.9);font-family:var(--font-ui)';
+  titleDiv.textContent = 'DevSpace OS';
+  page.appendChild(titleDiv);
+
+  var searchBox = document.createElement('div');
+  searchBox.style.cssText = 'width:100%;max-width:500px;background:#2b2b2b;border-radius:24px;padding:10px 20px;';
+  var searchInp = document.createElement('input');
+  searchInp.type = 'text';
+  searchInp.placeholder = 'Search or type a URL';
+  searchInp.autocomplete = 'off';
+  searchInp.spellcheck = false;
+  searchInp.style.cssText = 'width:100%;background:transparent;border:none;outline:none;color:rgba(255,255,255,0.9);font-size:14px;font-family:var(--font-ui);caret-color:white;';
+  searchInp.addEventListener('keydown', (function(tid){ return function(e){ if(e.key==='Enter'){ var t=browserNormalize(e.target.value); if(t) browserTabNav(tid,t); } }; })(id));
+  searchBox.appendChild(searchInp);
+  page.appendChild(searchBox);
+
+  var scGrid = document.createElement('div');
+  scGrid.className = 'browser-sc-grid';
+  var shortcuts = [
+    {name:'Google',url:'https://google.com',color:'#1a73e8'},
+    {name:'YouTube',url:'https://youtube.com',color:'#ff0000'},
+    {name:'Reddit',url:'https://reddit.com',color:'#ff4500'},
+    {name:'Twitter',url:'https://twitter.com',color:'#000000'},
+    {name:'Discord',url:'https://discord.com',color:'#5865f2'},
+    {name:'GitHub',url:'https://github.com',color:'#24292e'},
+    {name:'Twitch',url:'https://twitch.tv',color:'#9147ff'},
+    {name:'Wikipedia',url:'https://wikipedia.org',color:'#636363'},
+  ];
+  shortcuts.forEach(function(s) {
+    var sc = document.createElement('div');
+    sc.className = 'browser-sc';
+    sc.addEventListener('click', (function(tid,u){ return function(){ browserTabNav(tid,u); }; })(id, s.url));
+    var icon = document.createElement('div');
+    icon.className = 'browser-sc-icon';
+    icon.style.background = s.color;
+    icon.textContent = s.name.substring(0,2).toUpperCase();
+    var lbl = document.createElement('div');
+    lbl.className = 'browser-sc-lbl';
+    lbl.textContent = s.name;
+    sc.appendChild(icon); sc.appendChild(lbl);
+    scGrid.appendChild(sc);
+  });
+  page.appendChild(scGrid);
+  content.appendChild(page);
+
+  // Iframe
+  var iframe = document.createElement('iframe');
+  iframe.className = 'browser-tab-iframe';
+  iframe.id = 'frame-' + id;
+  content.appendChild(iframe);
+
+  browserSwitchTab(id);
+  if (url) browserTabNav(id, url);
+  return id;
+}
+
+
+function browserSwitchTab(id) {
+  // Deactivate all
+  browserTabs.forEach(function(t) {
+    var pill = document.getElementById('pill-' + t.id);
+    var page = document.getElementById('page-' + t.id);
+    var frame = document.getElementById('frame-' + t.id);
+    if (pill) pill.classList.remove('active');
+    if (page) page.classList.remove('active');
+    if (frame) frame.classList.remove('active');
+  });
+  // Activate target
+  browserActiveTab = id;
+  var tab = browserTabs.find(function(t){ return t.id === id; });
+  var pill = document.getElementById('pill-' + id);
+  var page = document.getElementById('page-' + id);
+  var frame = document.getElementById('frame-' + id);
+  if (pill) pill.classList.add('active');
+  var urlInput = document.getElementById('browser-url-input');
+  if (tab) {
+    if (urlInput) urlInput.value = tab.url || '';
+    if (tab.url && frame) {
+      page.classList.remove('active');
+      frame.classList.add('active');
+    } else {
+      if (page) page.classList.add('active');
+    }
+  }
+}
+
+function browserTabNav(id, target) {
+  var tab = browserTabs.find(function(t){ return t.id === id; });
+  if (!tab) return;
+  tab.url = target;
+  tab.hist.push(target);
+  tab.fwd = [];
+  var titleEl = document.getElementById('title-' + id);
+  if (titleEl) titleEl.textContent = target.replace(/^https?:\/\//, '').split('/')[0];
+  var frame = document.getElementById('frame-' + id);
+  var page = document.getElementById('page-' + id);
+  if (frame) { frame.src = browserEncode(target); frame.classList.add('active'); }
+  if (page) page.classList.remove('active');
+  var urlInput = document.getElementById('browser-url-input');
+  if (urlInput && id === browserActiveTab) urlInput.value = target;
+}
+
+function browserCloseTab(e, id) {
+  e.stopPropagation();
+  if (browserTabs.length <= 1) { browserNewTab(); }
+  var idx = browserTabs.findIndex(function(t){ return t.id === id; });
+  browserTabs.splice(idx, 1);
+  var pill = document.getElementById('pill-' + id);
+  var page = document.getElementById('page-' + id);
+  var frame = document.getElementById('frame-' + id);
+  if (pill) pill.remove();
+  if (page) page.remove();
+  if (frame) frame.remove();
+  if (browserActiveTab === id) {
+    var next = browserTabs[Math.min(idx, browserTabs.length - 1)];
+    if (next) browserSwitchTab(next.id);
+  }
 }
 
 function browserGo(e) {
   if (e && e.key !== 'Enter') return;
   var raw = document.getElementById('browser-url-input').value;
-  var target = browserNormalize(raw);
-  if (!target) return;
-  browserNavTo(target);
+  var t = browserNormalize(raw);
+  if (t && browserActiveTab) browserTabNav(browserActiveTab, t);
 }
 
-function browserGoBtn() {
-  var raw = document.getElementById('browser-url-input').value;
-  var target = browserNormalize(raw);
-  if (!target) return;
-  browserNavTo(target);
+function browserNewtabGo(e, tabId) {
+  if (e && e.key !== 'Enter') return;
+  var raw = e.target.value;
+  var t = browserNormalize(raw);
+  if (t) browserTabNav(tabId, t);
+}
+
+function browserNavTo(target) {
+  if (!browserActiveTab) browserNewTab(target);
+  else browserTabNav(browserActiveTab, target);
 }
 
 function browserBack() {
-  if (browserHist.length > 1) {
-    browserHist.pop();
-    var prev = browserHist[browserHist.length - 1];
-    browserNavTo(prev);
-    browserHist.pop(); // browserNavTo pushes again
-  }
+  var tab = browserTabs.find(function(t){ return t.id === browserActiveTab; });
+  if (!tab || tab.hist.length <= 1) return;
+  tab.fwd.push(tab.hist.pop());
+  var prev = tab.hist[tab.hist.length - 1];
+  tab.url = prev;
+  var frame = document.getElementById('frame-' + tab.id);
+  var page = document.getElementById('page-' + tab.id);
+  if (frame) { frame.src = browserEncode(prev); frame.classList.add('active'); }
+  if (page) page.classList.remove('active');
+  var urlInput = document.getElementById('browser-url-input');
+  if (urlInput) urlInput.value = prev;
+}
+
+function browserFwd() {
+  var tab = browserTabs.find(function(t){ return t.id === browserActiveTab; });
+  if (!tab || !tab.fwd.length) return;
+  var next = tab.fwd.pop();
+  browserTabNav(tab.id, next);
 }
 
 function browserReload() {
-  var frame = document.getElementById('browser-frame');
-  if (frame && frame.src) { var s = frame.src; frame.src = ''; frame.src = s; }
+  var tab = browserTabs.find(function(t){ return t.id === browserActiveTab; });
+  if (!tab || !tab.url) return;
+  var frame = document.getElementById('frame-' + tab.id);
+  if (frame) { var s = frame.src; frame.src = 'about:blank'; setTimeout(function(){ frame.src = s; }, 50); }
 }
+
+// Init browser with one tab
+function browserInit() {
+  browserNewTab();
+}
+
 
 /* ── BOOT ────────────────────────────────────────────────────────────────── */
 feInit();
